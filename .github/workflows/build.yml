@@ -1,0 +1,206 @@
+# GitHub Actions loads only repository-root workflows.
+# The copy that runs is /.github/workflows/dataflow-cli.yml. Keep both files the same.
+name: dataflow-cli
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+    paths:
+      - 'dataflow-cli/**'
+      - 'dataflow/**'
+      - '.github/workflows/dataflow-cli.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'dataflow-cli/**'
+      - 'dataflow/**'
+      - '.github/workflows/dataflow-cli.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dataflow-cli
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: dataflow-cli/go.sum
+
+      - name: Run tests
+        run: go test ./...
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test]
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: ""
+          - goos: linux
+            goarch: arm64
+            suffix: ""
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+            suffix: -v7
+          - goos: darwin
+            goarch: amd64
+            suffix: ""
+          - goos: darwin
+            goarch: arm64
+            suffix: ""
+          - goos: windows
+            goarch: amd64
+            suffix: ""
+          - goos: windows
+            goarch: arm64
+            suffix: ""
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: dataflow-cli/go.sum
+
+      - name: Build
+        working-directory: dataflow-cli
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: "0"
+          GOWORK: "off"
+        run: |
+          BINARY=dataflow-cli
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY=dataflow-cli.exe
+          fi
+          go build -trimpath -ldflags "-s -w" -o "$BINARY" .
+          echo "BINARY=$BINARY" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataflow-cli-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+          path: dataflow-cli/${{ env.BINARY }}
+
+  image:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/dataflow-cli
+          tags: |
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: dataflow-cli/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build, image]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          for d in artifacts/dataflow-cli-*; do
+            [ -d "$d" ] || continue
+            name=$(basename "$d")
+            f=$(find "$d" -type f -print -quit)
+            [ -z "$f" ] && continue
+            case "$name" in
+              *windows*) cp "$f" "release/${name}.exe" ;;
+              *) cp "$f" "release/$name" ;;
+            esac
+          done
+          cd release
+          sha256sum * > SHA256SUMS
+          ls -la
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: dataflow-cli ${{ github.ref_name }}
+          body: |
+            ## dataflow-cli ${{ github.ref_name }}
+
+            CLI for the DataFlow operator: Web API client, local manifest run, and one-shot migration.
+
+            ### Container
+
+            `ghcr.io/${{ github.repository_owner }}/dataflow-cli:${{ github.ref_name }}`
+            `ghcr.io/${{ github.repository_owner }}/dataflow-cli:latest`
+
+            Platforms: linux/amd64, linux/arm64.
+
+            ### Binaries
+
+            Linux (amd64, arm64, armv7), macOS (amd64, arm64), Windows (amd64, arm64).
+            Checksums: `SHA256SUMS`.
+          files: release/*
+          draft: false

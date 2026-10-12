@@ -1,0 +1,31 @@
+# Taskfile for dataflow-cli
+# Install: https://taskfile.dev/install
+# Run: task build | task run -- run path/to/manifest.yaml
+
+version: '3'
+
+vars:
+  BINARY: bin/dataflow-cli
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build dataflow-cli binary locally
+    cmds:
+      - mkdir -p bin
+      - go build -o {{.BINARY}} .
+
+  run:
+    desc: "Run dataflow-cli without building (go run). Use: task run -- run path/to/manifest.yaml"
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  docker:
+    desc: Build the CLI image. Run from the monorepo root context.
+    dir: ..
+    cmds:
+      - docker build -f dataflow-cli/Dockerfile -t dataflow-cli .
