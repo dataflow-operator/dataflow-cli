@@ -1,3 +1,9 @@
+## 1.0.2 (2026-10-12)
+
+## Commits
+
+- 92f2d54 Update README to include 'hive' as a supported source for the --once flag
+
 ## 1.0.1 (2026-10-12)
 
 ## Commits

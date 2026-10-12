@@ -3,7 +3,7 @@ module github.com/dataflow-operator/dataflow-cli
 go 1.25.0
 
 require (
-	github.com/dataflow-operator/dataflow v1.12.1-0.20261012061201-dec4eee83b3d
+	github.com/dataflow-operator/dataflow v1.13.0
 	github.com/spf13/cobra v1.10.0
 	github.com/stretchr/testify v1.11.1
 	sigs.k8s.io/yaml v1.6.0
