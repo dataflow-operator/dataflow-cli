@@ -120,7 +120,7 @@ Stop with Ctrl+C.
 
 `--once` reads a polling source until it is exhausted, flushes the sink, writes a local checkpoint, and exits. Use it for a one-time snapshot (for example PostgreSQL to PostgreSQL) without a cluster. `kind: DataFlowCron` is accepted; `schedule` and `triggers` are ignored.
 
-Supported sources: `postgresql`, `clickhouse`, `trino`, `iceberg`, `nessie`. `kafka` and `postgresql-cdc` never close, so `--once` fails before connecting.
+Supported sources: `postgresql`, `clickhouse`, `trino`, `iceberg`, `nessie`, `hive`. `kafka` and `postgresql-cdc` never close, so `--once` fails before connecting.
 
 ```bash
 dataflow-cli run manifest.yaml --once
