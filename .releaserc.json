@@ -31,7 +31,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "GOWORK=off go get github.com/dataflow-operator/dataflow@latest && GOWORK=off go mod tidy"
+        "prepareCmd": "sh scripts/bump-dataflow.sh"
       }
     ],
     [

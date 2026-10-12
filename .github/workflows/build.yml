@@ -203,6 +203,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -221,9 +224,31 @@ jobs:
               *) cp "$f" "release/$name" ;;
             esac
           done
+          for name in dataflow-cli-darwin-amd64 dataflow-cli-darwin-arm64 dataflow-cli-linux-amd64 dataflow-cli-linux-arm64; do
+            [ -f "release/$name" ] || { echo "missing release/$name" >&2; exit 1; }
+            stage=$(mktemp -d)
+            cp "release/$name" "$stage/dataflow-cli"
+            chmod +x "$stage/dataflow-cli"
+            tar -C "$stage" -czf "release/${name}.tar.gz" dataflow-cli
+            rm -rf "$stage"
+          done
           cd release
           sha256sum * > SHA256SUMS
           ls -la
+
+      - name: Render Homebrew formula
+        run: |
+          version="${{ needs.release-version.outputs.new_release_version }}"
+          version="${version#v}"
+          sha() { sha256sum "release/$1" | awk '{print $1}'; }
+          mkdir -p formula
+          sh scripts/homebrew-formula.sh \
+            "$version" \
+            "$(sha dataflow-cli-darwin-arm64.tar.gz)" \
+            "$(sha dataflow-cli-darwin-amd64.tar.gz)" \
+            "$(sha dataflow-cli-linux-arm64.tar.gz)" \
+            "$(sha dataflow-cli-linux-amd64.tar.gz)" \
+            > formula/dataflow-cli.rb
 
       - name: Attach binaries
         uses: softprops/action-gh-release@v2
@@ -231,3 +256,27 @@ jobs:
           tag_name: ${{ needs.release-version.outputs.new_release_git_tag }}
           files: release/*
           draft: false
+
+      - name: Publish Homebrew formula
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.release-version.outputs.new_release_version }}
+        run: |
+          if [ -z "${TAP_TOKEN}" ]; then
+            echo "HOMEBREW_TAP_TOKEN is required to publish the Homebrew formula" >&2
+            exit 1
+          fi
+          version="${VERSION#v}"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/dataflow-operator/homebrew-tap.git" tap
+          cd tap
+          git checkout -B main
+          mkdir -p Formula
+          cp ../formula/dataflow-cli.rb Formula/dataflow-cli.rb
+          git add Formula/dataflow-cli.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew formula unchanged"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "dataflow-cli ${version}"
+          git push origin HEAD:main
