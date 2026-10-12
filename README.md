@@ -53,13 +53,13 @@ docker run --rm --network host \
   run manifest.yaml --once
 ```
 
-Build from the monorepo root (the CLI module replaces `../dataflow`):
+Build from the CLI module directory (`dataflow-cli/` in the monorepo, the repository root in `dataflow-operator/dataflow-cli`):
 
 ```bash
-docker build -f dataflow-cli/Dockerfile -t dataflow-cli .
+docker build -t dataflow-cli .
 ```
 
-From `dataflow-cli/`, `task docker` runs the same build.
+`task docker` runs the same build.
 
 ### From source
 
@@ -68,7 +68,7 @@ From `dataflow-cli/`, `task docker` runs the same build.
 - In the monorepo, `go.work` still builds against the local `dataflow` checkout.
 - `dataflow-cli --version` prints `dev` unless the build sets `-ldflags "-X github.com/dataflow-operator/dataflow-cli/cmd.Version=..."`. `task build` fills that from `git describe`.
 
-A push to `main` that changes `dataflow-cli/` runs semantic-release. It tags `dataflow-cli/vX.Y.Z`, refreshes the `dataflow` module with `go get @latest`, and the tag build stamps that version into the binary and image.
+A push to `main` of the `dataflow-operator/dataflow-cli` repository runs semantic-release. It tags `vX.Y.Z`, refreshes the `dataflow` module with `go get @latest`, and the same workflow stamps that version into the binaries and the image. The GitHub token that creates the tag does not start a second workflow.
 
 ## Web API (same actions as the web UI)
 
@@ -160,10 +160,10 @@ spec:
 
 ## CI
 
-GitHub runs [`.github/workflows/dataflow-cli.yml`](https://github.com/dataflow-operator/dataflow-operator/blob/main/.github/workflows/dataflow-cli.yml) on changes under `dataflow-cli/` or `dataflow/`. The same workflow is kept at [`dataflow-cli/.github/workflows/build.yml`](.github/workflows/build.yml); Actions only loads workflows from the repository root.
+In the published repository the workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml). It runs on every push to `main` and on pull requests. There is no path filter.
 
-- tests on pull requests, pushes to `main`, and tags `dataflow-cli/v*`;
-- semantic-release on `main`: tag `dataflow-cli/vX.Y.Z` and `go get github.com/dataflow-operator/dataflow@latest`;
+- tests on pull requests and pushes to `main`;
+- semantic-release on `main`: tag `vX.Y.Z` and `go get github.com/dataflow-operator/dataflow@latest`;
 - binaries for Linux (amd64, arm64, armv7), macOS (amd64, arm64), and Windows (amd64, arm64), with the version linked into the binary;
 - container image `ghcr.io/dataflow-operator/dataflow-cli` for `linux/amd64` and `linux/arm64`;
-- GitHub Release with binaries and `SHA256SUMS` when a `dataflow-cli/v*` tag is pushed.
+- GitHub Release assets attached in the same run that creates the `v*` tag.

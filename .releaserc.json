@@ -1,6 +1,6 @@
 {
   "branches": ["main"],
-  "tagFormat": "dataflow-cli/v${version}",
+  "tagFormat": "v${version}",
   "plugins": [
     [
       "@semantic-release/commit-analyzer",
@@ -23,7 +23,7 @@
         ]
       }
     ],
-    "../scripts/semantic-release/commit-list-notes.cjs",
+    "./scripts/semantic-release/commit-list-notes.cjs",
     [
       "@semantic-release/changelog",
       {"changelogFile": "CHANGELOG.md"}

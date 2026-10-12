@@ -28,7 +28,6 @@ tasks:
       - go run . {{.CLI_ARGS}}
 
   docker:
-    desc: Build the CLI image. Run from the monorepo root context.
-    dir: ..
+    desc: Build the CLI image from this module
     cmds:
-      - docker build -f dataflow-cli/Dockerfile -t dataflow-cli .
+      - docker build -t dataflow-cli .
