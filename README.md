@@ -64,7 +64,11 @@ From `dataflow-cli/`, `task docker` runs the same build.
 ### From source
 
 - `go build -o dataflow-cli .` in `dataflow-cli` ([Go 1.25+](https://go.dev/dl/)).
-- In the monorepo, `replace github.com/dataflow-operator/dataflow => ../dataflow` is already set in `go.mod`.
+- `go.mod` requires `github.com/dataflow-operator/dataflow` at the latest released version (`v1.12.0` today). There is no local `replace`.
+- In the monorepo, `go.work` still builds against the local `dataflow` checkout.
+- `dataflow-cli --version` prints `dev` unless the build sets `-ldflags "-X github.com/dataflow-operator/dataflow-cli/cmd.Version=..."`. `task build` fills that from `git describe`.
+
+A push to `main` that changes `dataflow-cli/` runs semantic-release. It tags `dataflow-cli/vX.Y.Z`, refreshes the `dataflow` module with `go get @latest`, and the tag build stamps that version into the binary and image.
 
 ## Web API (same actions as the web UI)
 
@@ -158,7 +162,8 @@ spec:
 
 GitHub runs [`.github/workflows/dataflow-cli.yml`](https://github.com/dataflow-operator/dataflow-operator/blob/main/.github/workflows/dataflow-cli.yml) on changes under `dataflow-cli/` or `dataflow/`. The same workflow is kept at [`dataflow-cli/.github/workflows/build.yml`](.github/workflows/build.yml); Actions only loads workflows from the repository root.
 
-- tests on pull requests, pushes to `main`, and `v*` tags;
-- binaries for Linux (amd64, arm64, armv7), macOS (amd64, arm64), and Windows (amd64, arm64);
+- tests on pull requests, pushes to `main`, and tags `dataflow-cli/v*`;
+- semantic-release on `main`: tag `dataflow-cli/vX.Y.Z` and `go get github.com/dataflow-operator/dataflow@latest`;
+- binaries for Linux (amd64, arm64, armv7), macOS (amd64, arm64), and Windows (amd64, arm64), with the version linked into the binary;
 - container image `ghcr.io/dataflow-operator/dataflow-cli` for `linux/amd64` and `linux/arm64`;
-- GitHub Release with binaries and `SHA256SUMS` when a `v*` tag is pushed.
+- GitHub Release with binaries and `SHA256SUMS` when a `dataflow-cli/v*` tag is pushed.

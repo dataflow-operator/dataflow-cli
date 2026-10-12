@@ -8,6 +8,7 @@ on:
       - main
     tags:
       - 'v*'
+      - 'dataflow-cli/v*'
     paths:
       - 'dataflow-cli/**'
       - 'dataflow/**'
@@ -26,6 +27,38 @@ permissions:
   packages: write
 
 jobs:
+  release-version:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: dataflow-cli
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: dataflow-cli/go.sum
+
+      - name: Semantic release
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          working_directory: dataflow-cli
+          extra_plugins: |
+            @semantic-release/changelog@6.0.0
+            @semantic-release/exec@7.0.0
+            @semantic-release/git@10.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     runs-on: ubuntu-latest
     defaults:
@@ -82,6 +115,17 @@ jobs:
           go-version: '1.25'
           cache-dependency-path: dataflow-cli/go.sum
 
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            v="${GITHUB_REF_NAME#dataflow-cli/v}"
+            v="${v#v}"
+          else
+            v="dev-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
       - name: Build
         working-directory: dataflow-cli
         env:
@@ -89,13 +133,12 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
           CGO_ENABLED: "0"
-          GOWORK: "off"
         run: |
           BINARY=dataflow-cli
           if [ "${{ matrix.goos }}" = "windows" ]; then
             BINARY=dataflow-cli.exe
           fi
-          go build -trimpath -ldflags "-s -w" -o "$BINARY" .
+          go build -trimpath -ldflags "-s -w -X github.com/dataflow-operator/dataflow-cli/cmd.Version=${{ steps.version.outputs.version }}" -o "$BINARY" .
           echo "BINARY=$BINARY" >> "$GITHUB_ENV"
 
       - name: Upload artifact
@@ -133,8 +176,19 @@ jobs:
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=match,pattern=dataflow-cli/v(.*),group=1
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/dataflow-cli/v') }}
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            v="${GITHUB_REF_NAME#dataflow-cli/v}"
+            v="${v#v}"
+          else
+            v="dev-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -145,13 +199,15 @@ jobs:
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   release:
     runs-on: ubuntu-latest
     needs: [build, image]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/dataflow-cli/v')
     permissions:
       contents: write
       packages: write

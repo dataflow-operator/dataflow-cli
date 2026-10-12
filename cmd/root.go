@@ -33,9 +33,10 @@ var (
 
 // rootCmd represents the base command
 var rootCmd = &cobra.Command{
-	Use:   "dataflow-cli",
-	Short: "CLI for DataFlow operator: Web API client and local manifest run",
-	Long:  `dataflow-cli talks to the dataflow-web API (list/create/update/delete dataflows, logs, status, metrics) and can run DataFlow manifests locally without Kubernetes.`,
+	Use:     "dataflow-cli",
+	Short:   "CLI for DataFlow operator: Web API client and local manifest run",
+	Long:    `dataflow-cli talks to the dataflow-web API (list/create/update/delete dataflows, logs, status, metrics) and can run DataFlow manifests locally without Kubernetes.`,
+	Version: Version,
 }
 
 // Execute runs the root command.

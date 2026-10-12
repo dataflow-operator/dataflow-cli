@@ -1,26 +1,23 @@
 # syntax=docker/dockerfile:1
-# Build context is the monorepo root (the CLI replaces ../dataflow):
+# Build context is the monorepo root. go.work selects the local dataflow module.
 #   docker build -f dataflow-cli/Dockerfile -t dataflow-cli .
 FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
 WORKDIR /src
-COPY dataflow/go.mod dataflow/go.sum /src/dataflow/
-COPY dataflow-cli/go.mod dataflow-cli/go.sum /src/dataflow-cli/
+COPY go.work go.work.sum ./
+COPY dataflow/go.mod dataflow/go.sum ./dataflow/
+COPY dataflow-cli/go.mod dataflow-cli/go.sum ./dataflow-cli/
+RUN cd dataflow-cli && go mod download
 
-WORKDIR /src/dataflow-cli
-ENV GOWORK=off
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
-
-COPY dataflow /src/dataflow
-COPY dataflow-cli /src/dataflow-cli
+COPY dataflow ./dataflow
+COPY dataflow-cli ./dataflow-cli
 
 ARG TARGETARCH
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags "-s -w" \
+ARG VERSION=dev
+RUN cd dataflow-cli && CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags "-s -w -X github.com/dataflow-operator/dataflow-cli/cmd.Version=${VERSION}" \
     -o /out/dataflow-cli .
 
 FROM alpine:3.21

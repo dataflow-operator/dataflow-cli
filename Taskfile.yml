@@ -6,6 +6,9 @@ version: '3'
 
 vars:
   BINARY: bin/dataflow-cli
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  LDFLAGS: -s -w -X github.com/dataflow-operator/dataflow-cli/cmd.Version={{.VERSION}}
 
 tasks:
   default:
@@ -17,7 +20,7 @@ tasks:
     desc: Build dataflow-cli binary locally
     cmds:
       - mkdir -p bin
-      - go build -o {{.BINARY}} .
+      - go build -trimpath -ldflags "{{.LDFLAGS}}" -o {{.BINARY}} .
 
   run:
     desc: "Run dataflow-cli without building (go run). Use: task run -- run path/to/manifest.yaml"
