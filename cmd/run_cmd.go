@@ -53,7 +53,7 @@ var runCmd = &cobra.Command{
 	Long: `Loads a DataFlow or DataFlowCron manifest and runs the pipeline in-process.
 Source and sink must be reachable (for example Kafka or Postgres). Stop with Ctrl+C.
 
---once runs until a polling source is exhausted (postgresql, clickhouse, trino, iceberg, nessie),
+--once runs until a polling source is exhausted (postgresql, clickhouse, trino, iceberg, nessie, hive),
 writes a local checkpoint file, and exits. Kafka and postgresql-cdc are rejected.
 DataFlowCron schedule and triggers are not executed.`,
 	Args: cobra.ExactArgs(1),
